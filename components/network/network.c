@@ -20,10 +20,9 @@ static const char *TAG_TRANSPORT    = "[NETWORK][TRANSPORT]";
  *  State
  * ------------------------------------------------------------------ */
 
-static const transport_ops_t *s_active       = NULL;
-static network_proto_t        s_proto        = NETWORK_PROTO_HTTP;
-static bool                   s_wifi_ready   = false;
-static bool                   s_transport_up = false;
+static network_proto_t s_proto        = NETWORK_PROTO_HTTP;
+static bool            s_wifi_ready   = false;
+static bool            s_transport_up = false;
 
 /* ------------------------------------------------------------------
  *  Transport vtable
@@ -57,7 +56,7 @@ static const transport_ops_t *s_active = NULL;
  *  WiFi callbacks
  * ------------------------------------------------------------------ */
 
-static void s_on_wifi_connected(){
+static void s_on_wifi_connected(void) {
     ESP_LOGI(TAG_WIFI, "Connected");
     s_wifi_ready = true;
 
@@ -72,12 +71,11 @@ static void s_on_wifi_connected(){
     }
 }
 
-static void s_on_wifi_disconnected(){
+static void s_on_wifi_disconnected(void) {
     ESP_LOGW(TAG_WIFI, "Disconnected");
     s_wifi_ready = false;
     s_transport_up = false;
 }
-
 
 /* ------------------------------------------------------------------
  *  WiFi internal
@@ -92,43 +90,32 @@ static WiFiManager_t s_wm = {
     }
 };
 
-static void wifi_init(void){
+static void wifi_init(void) {
     s_wm.ConnectedAP_Cb = s_on_wifi_connected;
     s_wm.DisconnectedAP_Cb = s_on_wifi_disconnected;
     s_wm.sta_retry_num = 5;
+    WiFiManagerPage_Init(&s_wm);
+    WiFiManagerPage_AddParam(&s_wm, "host", "Host", "e.g. broker.example.com", "", "text", true);
+    WiFiManagerPage_AddParam(&s_wm, "port", "Port", "e.g. 8883", "", "number", true);
+    WiFiManagerPage_AddParam(&s_wm, "token", "Token", "Bearer token", "", "password", true);
     WiFiManager_Init(&s_wm);
 }
 
-static void wifi_connect(void){
+static void wifi_connect(void) {
     WiFiManager_AutoConnect(&s_wm);
 }
 
-static void wifi_stop(void){
+static void wifi_stop(void) {
     WiFiManager_Stop(&s_wm);
     s_wifi_ready = false;
     s_transport_up = false;
-}
-
-
-/* ------------------------------------------------------------------
- *  Helpers
- * ------------------------------------------------------------------ */
-
-static network_err_t from_esp(esp_err_t err) {
-    switch (err) {
-        case ESP_OK:                return NETWORK_OK;
-        case ESP_ERR_INVALID_ARG:   return NETWORK_ERR_INVALID_ARG;
-        case ESP_ERR_INVALID_STATE: return NETWORK_ERR_INVALID_STATE;
-        default:                    return NETWORK_ERR_TRANSPORT;
-    }
 }
 
 /* ------------------------------------------------------------------ */
 /*  Public API                                                         */
 /* ------------------------------------------------------------------ */
 
-network_err_t network_init(network_proto_t proto)
-{
+network_err_t network_init(network_proto_t proto) {
     if (proto >= sizeof(s_transports) / sizeof(s_transports[0])) {
         return NETWORK_ERR_INVALID_ARG;
     }
@@ -139,14 +126,23 @@ network_err_t network_init(network_proto_t proto)
     ESP_LOGI(TAG_TRANSPORT, "Proto: %s", proto == NETWORK_PROTO_MQTT ? "MQTTS" : "HTTPS");
 
     wifi_init();
-    wifi_start();
+    wifi_connect();
 
     return NETWORK_OK;
 }
 
 network_err_t network_publish(const char *topic, const char *payload) {
-    if (!s_active || !s_transport_up) return NETWORK_ERR_INVALID_STATE;
-    return from_esp(s_active->publish(topic, payload));
+    if (!s_active || !s_transport_up) {
+        return NETWORK_ERR_INVALID_STATE;
+    }
+
+    esp_err_t err = s_active->publish(topic, payload);
+    switch (err) {
+        case ESP_OK:                return NETWORK_OK;
+        case ESP_ERR_INVALID_ARG:   return NETWORK_ERR_INVALID_ARG;
+        case ESP_ERR_INVALID_STATE: return NETWORK_ERR_INVALID_STATE;
+        default:                    return NETWORK_ERR_TRANSPORT;
+    }
 }
 
 bool network_is_ready(void) {
@@ -154,10 +150,19 @@ bool network_is_ready(void) {
 }
 
 network_err_t network_stop(void) {
-    if (!s_active) return NETWORK_OK;
-    network_err_t ret = from_esp(s_active->stop());
-    s_active = NULL;
-    s_transport_up = NULL;
+    if (!s_active) {
+        return NETWORK_OK;
+    }
+
+    esp_err_t err = s_active->stop();
+    s_active       = NULL;
+    s_transport_up = false;
     wifi_stop();
-    return ret;
+
+    switch (err) {
+        case ESP_OK:                return NETWORK_OK;
+        case ESP_ERR_INVALID_ARG:   return NETWORK_ERR_INVALID_ARG;
+        case ESP_ERR_INVALID_STATE: return NETWORK_ERR_INVALID_STATE;
+        default:                    return NETWORK_ERR_TRANSPORT;
+    }
 }

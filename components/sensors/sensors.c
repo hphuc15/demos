@@ -2,7 +2,6 @@
 #include "sensors.h"
 #include "bh1750.h"
 #include "i2c.h"
-#include "utilities.h"
 
 #include "esp_err.h"
 #include "esp_log.h"
@@ -34,6 +33,8 @@ static BH1750_Dev s_bh1750 = {
  * @brief Initialize all sensors
  */
 void sensors_init(void) {
+    i2c_init();
+    i2c_add_device(BH1750_I2C_ADDR_LOW, 100000);
     if (BH1750_Init(&s_bh1750, BH1750_MODE_CONT_H_RES) != BH1750_OK) {
         ESP_LOGE(TAG, "Failed to initialize BH1750");
     }
