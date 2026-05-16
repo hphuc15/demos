@@ -46,7 +46,7 @@ void sensors_read(SensorsData_t *out) {
 
 void sensors_log(const SensorsData_t *data) {
     if (data->has_lux) {
-        ESP_LOGI(TAG, "Light: %.2f lux", data->light_lux);
+        ESP_LOGI(TAG_LOG, "Light: %.2f lux", data->light_lux);
     }
 }
 

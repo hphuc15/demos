@@ -5,7 +5,7 @@
 #include <stdbool.h>
 
 esp_err_t http_transport_init(void);
-esp_err_t http_transport_publish(const char *topic, const char *payload);
+esp_err_t http_transport_publish(const char *payload);
 bool      http_transport_is_ready(void);
 esp_err_t http_transport_stop(void);
 

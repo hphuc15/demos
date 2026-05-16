@@ -3,6 +3,9 @@
 #include "mqtt_transport.h"
 #include "wifi.h"
 /* ESP-IDF libs */
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/semphr.h"
 #include "esp_log.h"
 #include "esp_err.h"
 /* Standard libs */
@@ -10,19 +13,19 @@
 
 /* LOG TAG */
 
-static const char *TAG              = "[NETWORK]";
+// static const char *TAG              = "[NETWORK]";
 static const char *TAG_WIFI         = "[NETWORK][WIFI]";
 static const char *TAG_TRANSPORT    = "[NETWORK][TRANSPORT]";
 
 /* STATE */
-
+static SemaphoreHandle_t s_publish_mutex = NULL;
 static network_proto_t s_proto = NETWORK_PROTO_HTTP;
 static bool s_transport_up = false;
 
 /* TRANSPORT VTABLE*/
 typedef struct {
     esp_err_t (*init)(void);
-    esp_err_t (*publish)(const char *topic, const char *payload);
+    esp_err_t (*publish)(const char *payload);
     bool (*is_ready)(void);
     esp_err_t (*stop)(void);
 } transport_ops_t;
@@ -70,7 +73,9 @@ static void network_wifi_connected_cb(void) {
  */
 static void network_wifi_disconnected_cb(void) {
     ESP_LOGW(TAG_WIFI, "Disconnected");
+    xSemaphoreTake(s_publish_mutex, pdMS_TO_TICKS(6000)); // > timeout HTTP (5000ms)
     s_transport_up = false;
+    xSemaphoreGive(s_publish_mutex);
 }
 
 /* PUBLIC APIs */
@@ -79,7 +84,7 @@ network_err_t network_init(network_proto_t proto) {
     if (proto >= sizeof(s_transports) / sizeof(s_transports[0])) {
         return NETWORK_ERR_INVALID_ARG;
     }
-
+    s_publish_mutex = xSemaphoreCreateMutex();
     s_proto = proto;
     s_active = &s_transports[proto];
 
@@ -94,12 +99,21 @@ network_err_t network_init(network_proto_t proto) {
     return NETWORK_OK;
 }
 
-network_err_t network_publish(const char *topic, const char *payload) {
+network_err_t network_publish(const char *payload) {
     if (!s_active || !s_transport_up) {
         return NETWORK_ERR_INVALID_STATE;
     }
 
-    esp_err_t err = s_active->publish(topic, payload);
+    if (xSemaphoreTake(s_publish_mutex, pdMS_TO_TICKS(6000)) != pdTRUE) {
+        return NETWORK_ERR_INVALID_STATE;
+    }
+
+    esp_err_t err = ESP_ERR_INVALID_STATE;
+    if (s_transport_up && s_active) {          // check lại sau khi có mutex
+        err = s_active->publish(payload);
+    }
+
+    xSemaphoreGive(s_publish_mutex);
     switch (err) {
         case ESP_OK:                return NETWORK_OK;
         case ESP_ERR_INVALID_ARG:   return NETWORK_ERR_INVALID_ARG;
@@ -108,18 +122,22 @@ network_err_t network_publish(const char *topic, const char *payload) {
     }
 }
 
+
 bool network_is_ready(void) {
-    return s_active && s_active->is_ready();
+    return wifi_is_ready() && s_active && s_active->is_ready();
 }
 
 network_err_t network_stop(void) {
     if (!s_active) {
         return NETWORK_OK;
     }
-
-    esp_err_t err = s_active->stop();
-    s_active       = NULL;
+    
+    xSemaphoreTake(s_publish_mutex, pdMS_TO_TICKS(6000));
     s_transport_up = false;
+    esp_err_t err = s_active->stop();
+    s_active = NULL;
+    xSemaphoreGive(s_publish_mutex);
+
     wifi_stop();
 
     switch (err) {
@@ -128,4 +146,15 @@ network_err_t network_stop(void) {
         case ESP_ERR_INVALID_STATE: return NETWORK_ERR_INVALID_STATE;
         default:                    return NETWORK_ERR_TRANSPORT;
     }
+}
+
+network_err_t network_reconfigure(void) {
+    xSemaphoreTake(s_publish_mutex, pdMS_TO_TICKS(6000));
+    s_transport_up = false;
+    if (s_active) s_active->stop();
+    xSemaphoreGive(s_publish_mutex);
+
+    wifi_stop();
+    wifi_config();
+    return NETWORK_OK;
 }

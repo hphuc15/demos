@@ -1,18 +1,20 @@
-// mqtt_transport.c
 #include "mqtt_transport.h"
-#include "network_config.h"
+#include "wifi.h"
 
 #include "mqtt_client.h"
 #include "esp_crt_bundle.h"
 #include "esp_log.h"
 
 static const char *TAG_MQTT = "[NETWORK][MQTT]";
+
 #define MQTT_PUBLISH_QOS 1
 
 static esp_mqtt_client_handle_t s_client = NULL;
 static bool s_ready = false;
 
-static void mqtt_event_handler(void *arg, esp_event_base_t base, int32_t event_id, void *event_data) {
+static void mqtt_event_handler(void *arg, esp_event_base_t base,
+                               int32_t event_id, void *event_data)
+{
     esp_mqtt_event_handle_t ev = event_data;
     switch (ev->event_id)
     {
@@ -32,28 +34,18 @@ static void mqtt_event_handler(void *arg, esp_event_base_t base, int32_t event_i
     }
 }
 
-/* PUBLIC APIs */
-
-esp_err_t mqtt_transport_init(void) {
+esp_err_t mqtt_transport_init(void)
+{
     if (s_client)
         return ESP_OK;
 
-    if (!network_config_exists())
-    {
-        ESP_LOGE(TAG_MQTT, "No config in NVS");
-        return ESP_ERR_INVALID_STATE;
-    }
-
-    network_config_t cfg = {0};
-    esp_err_t err = network_config_load(&cfg);
-    if (err != ESP_OK)
-    {
-        ESP_LOGE(TAG_MQTT, "Load config failed: %s", esp_err_to_name(err));
-        return err;
-    }
+    const char *host  = wifi_get_host();
+    uint32_t port  = wifi_get_port();
+    const char *token = wifi_get_token();
 
     char uri[128];
-    snprintf(uri, sizeof(uri), "mqtts://%s:%ld", cfg.host, cfg.port);
+    const bool use_tls = (port == 8883);
+    snprintf(uri, sizeof(uri), "%s://%s:%ld", use_tls ? "mqtts" : "mqtt", host, port);
 
     esp_mqtt_client_config_t config = {
         .broker = {
@@ -61,7 +53,7 @@ esp_err_t mqtt_transport_init(void) {
             .verification.crt_bundle_attach = esp_crt_bundle_attach,
         },
         .credentials = {
-            .username = cfg.token,
+            .username = token,
             .authentication.password = "",
         },
         .session.keepalive = 60,
@@ -74,42 +66,42 @@ esp_err_t mqtt_transport_init(void) {
 
     esp_mqtt_client_register_event(s_client, ESP_EVENT_ANY_ID, mqtt_event_handler, NULL);
 
-    esp_err_t ret = esp_mqtt_client_start(s_client);
-    if (ret != ESP_OK)
+    esp_err_t err = esp_mqtt_client_start(s_client);
+    if (err != ESP_OK)
     {
-        ESP_LOGE(TAG_MQTT, "client_start failed: %s", esp_err_to_name(ret));
+        ESP_LOGE(TAG_MQTT, "client_start failed: %s", esp_err_to_name(err));
         esp_mqtt_client_destroy(s_client);
         s_client = NULL;
+        return err;
     }
 
     ESP_LOGI(TAG_MQTT, "Connecting → %s", uri);
-    return ret;
+    return ESP_OK;
 }
 
-esp_err_t mqtt_transport_publish(const char *topic, const char *payload) {
+esp_err_t mqtt_transport_publish(const char *payload)
+{
     if (!s_ready || !s_client){
         return ESP_ERR_INVALID_STATE;
     }
-    if (!topic || !payload){
+    if (!payload){
         return ESP_ERR_INVALID_ARG;
     }
 
-    int msg_id = esp_mqtt_client_publish(s_client, topic, payload, 0, MQTT_PUBLISH_QOS, 0);
-    if (msg_id < 0)
-    {
+    int msg_id = esp_mqtt_client_publish(s_client, "v1/devices/me/telemetry", payload, 0, MQTT_PUBLISH_QOS, 0);
+    if (msg_id < 0){
         ESP_LOGE(TAG_MQTT, "Publish failed");
         return ESP_FAIL;
     }
 
-    ESP_LOGD(TAG_MQTT, "Published msg_id=%d topic=%s", msg_id, topic);
+    ESP_LOGD(TAG_MQTT, "Published msg_id=%d", msg_id);
     return ESP_OK;
 }
 
-bool mqtt_transport_is_ready(void) {
-    return s_ready;
-}
+bool mqtt_transport_is_ready(void) { return s_ready; }
 
-esp_err_t mqtt_transport_stop(void) {
+esp_err_t mqtt_transport_stop(void)
+{
     if (!s_client){
         return ESP_OK;
     }
