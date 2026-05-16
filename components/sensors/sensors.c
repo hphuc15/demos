@@ -49,3 +49,33 @@ void sensors_log(const SensorsData_t *data) {
         ESP_LOGI(TAG, "Light: %.2f lux", data->light_lux);
     }
 }
+
+bool sensors_build_payload(const SensorsData_t *d, char *buf, size_t buf_size)
+{
+    char       *pos      = buf;
+    char       *end      = buf + buf_size;
+    const char *sep      = "";
+    bool        has_data = false;
+
+    pos += snprintf(pos, end - pos, "{");
+
+    // if (d->has_temperature) {
+    //     pos += snprintf(pos, end - pos, "%s\"temperature\":%.1f", sep, d->temperature_c);
+    //     sep = ","; has_data = true;
+    // }
+    // if (d->has_humidity) {
+    //     pos += snprintf(pos, end - pos, "%s\"humidity\":%.1f", sep, d->humidity_rh);
+    //     sep = ","; has_data = true;
+    // }
+    // if (d->has_co2) {
+    //     pos += snprintf(pos, end - pos, "%s\"co2\":%.0f", sep, d->co2_ppm);
+    //     has_data = true;
+    // }
+    if (d->has_lux) {
+        pos += snprintf(pos, end - pos, "%s\"light\":%.1f", sep, d->light_lux);
+        has_data = true;
+    }
+
+    snprintf(pos, end - pos, "}");
+    return has_data;
+}

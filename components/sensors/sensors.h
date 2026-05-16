@@ -12,5 +12,6 @@ typedef struct {
 void sensors_init(void);
 void sensors_read(SensorsData_t *out);
 void sensors_log(const SensorsData_t *data);
+bool sensors_build_payload(const SensorsData_t *d, char *buf, size_t buf_size);
 
 #endif /* SENSORS_H */

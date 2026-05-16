@@ -1,4 +1,3 @@
-// http_transport.h
 #ifndef HTTP_TRANSPORT_H
 #define HTTP_TRANSPORT_H
 

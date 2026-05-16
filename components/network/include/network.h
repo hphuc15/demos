@@ -4,6 +4,8 @@
 
 #include <stdbool.h>
 
+#define HTTP_PAYLOAD_SIZE 64
+
 typedef enum {
     NETWORK_OK = 0,
     NETWORK_ERR_INVALID_ARG,

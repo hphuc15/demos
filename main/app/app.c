@@ -8,16 +8,23 @@
 static SensorsData_t s_data = {0};
 
 static void app_task(void *args){
+    char payload[HTTP_PAYLOAD_SIZE];
     while(1){
         sensors_read(&s_data);
         sensors_log(&s_data);
+        if(network_is_ready()){
+            if(sensors_build_payload(&s_data, payload, sizeof(payload))){
+                network_publish(NULL, payload);
+            }
+        }
         vTaskDelay(pdMS_TO_TICKS(5000));
     }
 }
 
 void app_init(void){
     sensors_init();
-    xTaskCreate(app_task, "APP_TASK", 2048, NULL, 5, NULL);
+    network_init(NETWORK_PROTO_HTTP);
+    xTaskCreate(app_task, "APP_TASK", 8192, NULL, 5, NULL);
 }
 
 /* UTILITIES */
