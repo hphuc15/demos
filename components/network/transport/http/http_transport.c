@@ -9,7 +9,6 @@
 #include <stdio.h>
 
 static const char *TAG_HTTP = "[NETWORK][HTTP]";
-static const char *TAG_NVS = "[NETWORK][NVS]]";
 
 static bool s_ready = false;
 static char s_url[256] = {0};

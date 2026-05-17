@@ -251,14 +251,18 @@ static esp_err_t _wm_portal_requesthandler(httpd_req_t *req)
         content[ret] = '\0';
         _wm_parse_urlencoder(wm, content);
 
+        if (strlen((char *)wm->sta_config.ssid) == 0) {
+            ESP_LOGW(TAG_PORTAL, "Empty SSID, ignoring POST from: %s", content);
+            httpd_resp_set_status(req, "400 Bad Request");
+            httpd_resp_send(req, "SSID required", HTTPD_RESP_USE_STRLEN);
+            return ESP_OK;
+        }
+
         ESP_LOGI(TAG_PORTAL, "Form body: %s", content);
         httpd_resp_set_hdr(req, "Connection", "close");
         httpd_resp_send(req, "Data received", HTTPD_RESP_USE_STRLEN);
         ESP_LOGI(TAG_PORTAL, "Configuration received");
 
-        int sockfd = httpd_req_to_sockfd(req);
-        httpd_sess_trigger_close(wm->server, sockfd);
-        
         if (wm->portal_waiting_task){
             xTaskNotifyGive(wm->portal_waiting_task);
         }

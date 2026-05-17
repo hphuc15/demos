@@ -124,8 +124,14 @@ static const char *s_get_token(void)
 static void on_wifi_connected(void)
 {
     s_wifi_ready = true;
-    s_nvs_save(s_get_host(), s_get_port(), s_get_token());
-    s_nvs_loaded = false;
+
+    const char *host  = WiFiManagerPage_GetParam(&s_wm, "host");
+    const char *token = WiFiManagerPage_GetParam(&s_wm, "token");
+    if (host && host[0] && token && token[0]) {
+        s_nvs_save(s_get_host(), s_get_port(), s_get_token());
+        s_nvs_loaded = false;
+    }
+
     if (s_on_wifi_connected){
         s_on_wifi_connected();
     }
@@ -152,9 +158,9 @@ void wifi_init(void) {
     s_wm.sta_retry_num = 5;
 
     WiFiManagerPage_Init(&s_wm);
-    WiFiManagerPage_AddParam(&s_wm, "host", "Host", "e.g. broker.example.com", "", "text", true);
-    WiFiManagerPage_AddParam(&s_wm, "port", "Port", "e.g. 8883", "", "number", true);
-    WiFiManagerPage_AddParam(&s_wm, "token", "Token", "Bearer token", "", "password", true);
+    WiFiManagerPage_AddParam(&s_wm, "host", "Host", "e.g. broker.example.com", "", "text", false);
+    WiFiManagerPage_AddParam(&s_wm, "port", "Port", "e.g. 8883", "", "number", false);
+    WiFiManagerPage_AddParam(&s_wm, "token", "Token", "Bearer token", "", "password", false);
     WiFiManager_Init(&s_wm);
 }
 

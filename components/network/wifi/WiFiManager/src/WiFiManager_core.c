@@ -89,6 +89,7 @@ static void _wm_event_handler(void *arg, esp_event_base_t event_base, int32_t ev
             {
                 xEventGroupClearBits(wm->event.group, WM_EVENT_BIT_STACONNECTED);
                 xEventGroupSetBits(wm->event.group, WM_EVENT_BIT_STADISCONNECTED);
+                s_retry_remaining = wm->sta_retry_num;
                 if (wm->DisconnectedAP_Cb) {
                     wm->DisconnectedAP_Cb();
                 }
@@ -99,6 +100,7 @@ static void _wm_event_handler(void *arg, esp_event_base_t event_base, int32_t ev
     }
     else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP)
     {
+        s_retry_remaining = wm->sta_retry_num;
         xEventGroupClearBits(wm->event.group, WM_EVENT_BIT_STADISCONNECTED);
         xEventGroupSetBits(wm->event.group, WM_EVENT_BIT_STACONNECTED);
         ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;

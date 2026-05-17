@@ -1,7 +1,7 @@
 #include "app.h"
 #include "sensors.h"
 #include "network.h"
-#include "wifi_button.h"
+#include "hardware_config.h"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -9,7 +9,7 @@
 #include "esp_log.h"
 
 static SensorsData_t s_data = {0};
-static SemaphoreHandle_t s_data_mutex = NULL;
+static const char *TAG = "[APP]";
 
 static void wifi_config_task(void *arg) {
     network_reconfigure();
@@ -35,19 +35,19 @@ void network_task(void *args){
             if(sensors_build_payload(&s_data, payload, sizeof(payload))){
                 network_publish(payload);
             } else {
-                ESP_LOGW("APP", "Failed to build payload");
+                ESP_LOGW(TAG, "Failed to build payload");
             }
         } else {
-            ESP_LOGD("APP", "Network not ready, skip");
+            ESP_LOGD(TAG, "Network not ready, skip");
         }
         vTaskDelay(pdMS_TO_TICKS(5000));
     }
 }
 
 void app_init(void){
+    hw_init(on_btn_hold);
     sensors_init();
     network_init(NETWORK_PROTO_HTTP);
-    wifi_button_init(on_btn_hold);
 
     xTaskCreate(sensors_task, "SENSORS_TASK", 2048, NULL, 5, NULL);
     xTaskCreate(network_task, "NETWORK_TASK", 4096, NULL, 5, NULL);
