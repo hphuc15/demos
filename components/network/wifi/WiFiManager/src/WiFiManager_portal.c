@@ -59,6 +59,9 @@ static void dns_task(void *arg)
         socklen_t clen = sizeof(client);
         int len = recvfrom(srv->sock, buf, sizeof(buf), 0, (struct sockaddr *)&client, &clen);
 
+        if (len < 0) {
+            break;
+        }
         if (len < (int)sizeof(dns_hdr_t)){
             continue;
         }
@@ -239,6 +242,12 @@ static esp_err_t _wm_portal_requesthandler(httpd_req_t *req)
             return ESP_ERR_INVALID_ARG;
         }
 
+        if (req->content_len == 0) {
+            ESP_LOGW(TAG_PORTAL, "Empty POST body");
+            httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Empty request body");
+            return ESP_FAIL;
+        }
+
         char content[WM_PORTAL_BODY_SIZE];
         size_t recv_size = MIN(req->content_len, sizeof(content) - 1);
         int ret = httpd_req_recv(req, content, recv_size);
@@ -250,13 +259,6 @@ static esp_err_t _wm_portal_requesthandler(httpd_req_t *req)
         }
         content[ret] = '\0';
         _wm_parse_urlencoder(wm, content);
-
-        if (strlen((char *)wm->sta_config.ssid) == 0) {
-            ESP_LOGW(TAG_PORTAL, "Empty SSID, ignoring POST from: %s", content);
-            httpd_resp_set_status(req, "400 Bad Request");
-            httpd_resp_send(req, "SSID required", HTTPD_RESP_USE_STRLEN);
-            return ESP_OK;
-        }
 
         ESP_LOGI(TAG_PORTAL, "Form body: %s", content);
         httpd_resp_set_hdr(req, "Connection", "close");
