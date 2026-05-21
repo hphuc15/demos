@@ -39,6 +39,64 @@ Firmware built with **ESP-IDF**. Collects BH1750 data and publishes to server vi
 
 ---
 
+## Setup
+
+### 1. Configure `network_config.h`
+Fill in `./components/network/include/network_config.h` with your credentials:
+```c
+#ifndef NETWORK_CONFIG_H
+#define NETWORK_CONFIG_H
+
+#include "esp_err.h"
+#include <stddef.h>
+#include <stdbool.h>
+
+/* Server Credentials */
+#define SERVER_DEFAULT_HOST             "<default_server_host>"
+#define SERVER_DEFAULT_PORT             <default_server_port>     /* 443 for MQTTS, 1883 for MQTT, 8883 for MQTTS*/
+#define DEVICE_TOKEN_DEFAULT            "<default_device_token>"  /* BH1750_DEMO for Sensor Lab ThingsBoard server in this demo */
+/* Network NVS Credentials */
+#define NETWORK_CONFIG_NVS_NAMESPACE    "network_nvs"
+#define NETWORK_CONFIG_NVS_HOST_KEY     "host"
+#define NETWORK_CONFIG_NVS_PORT_KEY     "port"
+#define NETWORK_CONFIG_NVS_TOKEN_KEY    "token"
+/* ESP32 WiFi AP Credentials */
+#define NETWORK_CONFIG_WIFI_AP_SSID     "BH1750_DEMO"
+#define NETWORK_CONFIG_WIFI_AP_PASSWORD "BH1750_DEMO"
+
+#endif /* NETWORK_CONFIG_H */
+```
+
+### 2. Build anf flash firmware
+### 3. Connect to Wi-Fi via captive portal
+
+On first boot (or after holding the config button for 3 seconds), the device starts in AP mode:
+
+* Connect your phone/PC to Wi-Fi: **`BH1750_DEMO`** (password: `BH1750_DEMO`)
+* A captive portal opens automatically - fill in:
+
+| Field   | Example                   | Description              |
+| ------- | ------------------------- | ------------------------ |
+| `Host`  | `thingsboard.cloud`       | Broker or server host    |
+| `Port`  | `1883` / `8883` / `443`   | Port determines protocol |
+| `Token` | `your_device_token`       | Device access token      |
+
+* Submit and the device connects to your AP. Config is saved to NVS and reused on next boot.
+
+### 4. Protocol selection
+
+Protocol is selected automatically based on port:
+
+| Port   | Protocol |
+| ------ | -------- |
+| `1883` | MQTT     |
+| `8883` | MQTTS    |
+| others | HTTPS    |
+
+> **Note:** In this demo, `device_token` was set to `BH1750_DEMO`, used for the Sensor Lab ThingsBoard server.
+
+---
+
 ## Project Structure
 
 ```text
@@ -51,7 +109,7 @@ Firmware built with **ESP-IDF**. Collects BH1750 data and publishes to server vi
 ├── network                         # Network layer
 │   ├── include
 │   │   ├── network.h
-│   │   └── network_config.h
+│   │   └── network_config.h        # Network credentials
 │   ├── transport
 │   │   ├── http                    # HTTPS transport API
 │   │   │   ├── http_transport.h
@@ -99,15 +157,3 @@ Firmware built with **ESP-IDF**. Collects BH1750 data and publishes to server vi
 <p align="center">
   <img src="./docs/image/FLOW.png" alt="Flow" width="700"/>
 </p>
-
----
-
-## Sample Config
-
-| Macro                  | Value                     |
-| ---------------------- | ------------------------- |
-| `NETWORK_HOST`         | `thingsboard.cloud`       |
-| `NETWORK_PORT`         | `443`                     |
-| `NETWORK_DEVICE_TOKEN` | `<device_token>`          |
-| `NETWORK_MQTT_TOPIC`   | `v1/devices/me/telemetry` |
-| `HTTP_PAYLOAD_SIZE`    | `256`                     |
