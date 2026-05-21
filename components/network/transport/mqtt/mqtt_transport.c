@@ -12,8 +12,7 @@ static const char *TAG_MQTT = "[NETWORK][MQTT]";
 static esp_mqtt_client_handle_t s_client = NULL;
 static bool s_ready = false;
 
-static void mqtt_event_handler(void *arg, esp_event_base_t base,
-                               int32_t event_id, void *event_data)
+static void mqtt_event_handler(void *arg, esp_event_base_t base, int32_t event_id, void *event_data)
 {
     esp_mqtt_event_handle_t ev = event_data;
     switch (ev->event_id)
@@ -36,8 +35,9 @@ static void mqtt_event_handler(void *arg, esp_event_base_t base,
 
 esp_err_t mqtt_transport_init(void)
 {
-    if (s_client)
+    if (s_client){
         return ESP_OK;
+    }
 
     const char *host  = wifi_get_host();
     uint32_t port  = wifi_get_port();
@@ -45,7 +45,8 @@ esp_err_t mqtt_transport_init(void)
 
     char uri[128];
     const bool use_tls = (port == 8883);
-    snprintf(uri, sizeof(uri), "%s://%s:%ld", use_tls ? "mqtts" : "mqtt", host, port);
+    snprintf(uri, sizeof(uri), "%s://%s:%" PRIu32, use_tls ? "mqtts" : "mqtt", host, port);
+
 
     esp_mqtt_client_config_t config = {
         .broker = {
