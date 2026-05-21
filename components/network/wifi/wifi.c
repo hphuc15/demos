@@ -7,11 +7,14 @@
 
 #include <string.h>
 #include <stdlib.h>
-
-#define NVS_NAMESPACE "net_cfg"
-#define NVS_KEY_HOST "host"
-#define NVS_KEY_PORT "port"
-#define NVS_KEY_TOKEN "token"
+/* Server credentials */
+#define NVS_NAMESPACE       NETWORK_CONFIG_NVS_NAMESPACE
+#define NVS_KEY_HOST        NETWORK_CONFIG_NVS_HOST_KEY
+#define NVS_KEY_PORT        NETWORK_CONFIG_NVS_PORT_KEY
+#define NVS_KEY_TOKEN       NETWORK_CONFIG_NVS_TOKEN_KEY
+/* WiFi credentials */
+#define BH1750_AP_SSID      NETWORK_CONFIG_WIFI_AP_SSID
+#define BH1750_AP_PASSWORD  NETWORK_CONFIG_WIFI_AP_PASSWORD
 
 static const char *TAG_WIFI = "[NETWORK][WIFI]";
 static const char *TAG_NVS = "[NETWORK][NVS]";
@@ -23,8 +26,8 @@ static bool s_nvs_loaded = false;
 
 static WiFiManager_t s_wm = {
     .ap_config = {
-        .ssid = "2SL_Demo_BH1750",
-        .password = "2SL_Demo_BH1750",
+        .ssid = BH1750_AP_SSID,
+        .password = BH1750_AP_PASSWORD,
         .max_connection = 2,
         .authmode = WIFI_AUTH_WPA_WPA2_PSK,
     }};

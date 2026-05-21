@@ -19,7 +19,7 @@ typedef enum {
     NETWORK_PROTO_MQTT,
 } network_proto_t;
 
-network_err_t network_init(network_proto_t proto);
+network_err_t network_init(void);
 network_err_t network_publish(const char *payload);
 bool          network_is_ready(void);
 network_err_t network_stop(void);

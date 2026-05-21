@@ -46,6 +46,14 @@ static const transport_ops_t s_transports[] = {
 
 static const transport_ops_t *s_active = NULL;
 
+static network_proto_t s_proto_from_port(uint32_t port) {
+    switch (port) {
+        case 1883:
+        case 8883:  return NETWORK_PROTO_MQTT;
+        default:    return NETWORK_PROTO_HTTP;
+    }
+}
+
 /* WIFI CALLBACKs */
 
 /**
@@ -55,6 +63,10 @@ static const transport_ops_t *s_active = NULL;
 static void network_wifi_connected_cb(void) {
     ESP_LOGI(TAG_WIFI, "Connected");
     hw_led_set(HW_LED_ON);
+
+    network_proto_t proto = s_proto_from_port(wifi_get_port());
+    s_active = &s_transports[proto];
+    ESP_LOGI(TAG_TRANSPORT, "Proto: %s", proto == NETWORK_PROTO_MQTT ? "MQTTS" : "HTTPS");
 
     if (s_active && !s_transport_up) {
         esp_err_t err = s_active->init();
@@ -82,21 +94,11 @@ static void network_wifi_disconnected_cb(void) {
 
 /* PUBLIC APIs */
 
-network_err_t network_init(network_proto_t proto) {
-    if (proto >= sizeof(s_transports) / sizeof(s_transports[0])) {
-        return NETWORK_ERR_INVALID_ARG;
-    }
-    s_proto = proto;
-    s_active = &s_transports[proto];
-
-    ESP_LOGI(TAG_TRANSPORT, "Proto: %s", proto == NETWORK_PROTO_MQTT ? "MQTTS" : "HTTPS");
-
-    /* WiFi Setup */
+network_err_t network_init(void) {
     wifi_set_connected_cb(network_wifi_connected_cb);
     wifi_set_disconnected_cb(network_wifi_disconnected_cb);
     wifi_init();
     wifi_connect();
-
     return NETWORK_OK;
 }
 
