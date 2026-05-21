@@ -47,7 +47,7 @@ void network_task(void *args){
 void app_init(void){
     hw_init(on_btn_hold);
     sensors_init();
-    network_init(NETWORK_PROTO_HTTP);
+    network_init();
 
     xTaskCreate(sensors_task, "SENSORS_TASK", 2048, NULL, 5, NULL);
     xTaskCreate(network_task, "NETWORK_TASK", 4096, NULL, 5, NULL);
