@@ -25,8 +25,8 @@ A simple BH1750 implementation using the Arduino framework. Primarily created fo
 
 A BH1750 implementation based on ESP-IDF. This is currently the most well-structured version and serves as both an application example and a reference integration for:
 
-* `hphuc15/bare_drivers`
-* `hphuc15/WiFiPanel`
+* [`hphuc15/baredrv`](https://github.com/hphuc15/baredrv)
+* [`hphuc15/WiFiPanel`](https://github.com/hphuc15/WiFiPanel)
 
 ## License
 
