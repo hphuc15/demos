@@ -8,7 +8,8 @@ This repository contains multiple BH1750-related projects, each maintained as a 
 BH1750_Demo/
 ├── BH1750_2SL_Entry/
 ├── BH1750_Arduino/
-└── BH1750_ESP_IDF/
+├── BH1750_ESP_IDF/
+└── BH1750_STM32F401RCT6/
 ```
 
 ## Projects
@@ -27,6 +28,9 @@ A BH1750 implementation based on ESP-IDF. This is currently the most well-struct
 
 * [`hphuc15/baredrv`](https://github.com/hphuc15/baredrv)
 * [`hphuc15/WiFiPanel`](https://github.com/hphuc15/WiFiPanel)
+
+### `BH1750_STM32F401RCT6`
+A BH1750 implementation for the STM32F401RCT6, I created to learn STM32 programming. Built with CMake and STM32CubeCLT, following the `baredrv` driver pattern used across other sensor projects.
 
 ## License
 
