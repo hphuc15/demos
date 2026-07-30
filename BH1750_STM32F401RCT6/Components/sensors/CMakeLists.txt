@@ -1,0 +1,5 @@
+add_subdirectory(bh1750)
+add_library(sensors STATIC sensors.c)
+target_include_directories(sensors PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(sensors PUBLIC ${CMAKE_SOURCE_DIR}/Core/Inc)
+target_link_libraries(sensors PUBLIC bh1750 utilities stm32cubemx)
