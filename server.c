@@ -1,5 +1,6 @@
 /**
- * Build: gcc server.c -o server
+ * openssl req -x509 -newkey rsa:2048 -nodes -keyout server.key -out server.crt -days 365 -subj "/CN=localhost"
+ * Build: gcc server.c -o server -lmsquic
  */
 #include <stdio.h>
 #include <stdint.h>
@@ -35,15 +36,17 @@ static void send_reply(HQUIC stream) {
     qb->Length = (uint32_t)len;
     memcpy(qb->Buffer, resp, len);
 
-    if(MsQuic->StreamSend(stream, qb, 1, QUIC_SEND_FLAG_NONE, qb) > QUIC_STATUS_SUCCESS) {
+    if(QUIC_FAILED(MsQuic->StreamSend(stream, qb, 1, QUIC_SEND_FLAG_NONE, qb))) {
         printf("StreamSend failed\n");
         free(qb);
     }
 }
 
+/** @brief Handle the new stream opened by the remote peer. */
 static QUIC_STATUS QUIC_API stream_callback(HQUIC stream, void *ctx, QUIC_STREAM_EVENT *event) {
     (void)ctx;
     switch (event->Type) {
+        
         case QUIC_STREAM_EVENT_RECEIVE:
             for(uint32_t i = 0; i < event->RECEIVE.BufferCount; i++) {
                 const QUIC_BUFFER *b = &event->RECEIVE.Buffers[i];
@@ -80,24 +83,29 @@ static QUIC_STATUS QUIC_API stream_callback(HQUIC stream, void *ctx, QUIC_STREAM
 }
 
 
-
+/** @brief Trigger when any event caused on new connection. */
 static QUIC_STATUS QUIC_API connection_callback(HQUIC conn, void *ctx, QUIC_CONNECTION_EVENT *event){
     (void)ctx;
     switch (event->Type) {
+        /* Handshake done. */
         case QUIC_CONNECTION_EVENT_CONNECTED:
             fprintf(stdout, "Client connected (Handshake done).\n");
             break;
-        
+
+        /* The peer opens a new streams. */
         case QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED:
             MsQuic->SetCallbackHandler(event->PEER_STREAM_STARTED.Stream, (void*)stream_callback, NULL);
             break;
 
+        /* The connection drops by transport or protocol errors (timeout, loss, ...). */
         case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT:
 
+        /* The peer gracefully initiates connection close. */
         case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER:
             fprintf(stdout, "Client disconnected.\n");
             break;
 
+        /* Shutdown finished, ConnectionClose to free resource. */
         case QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE:
             MsQuic->ConnectionClose(conn);
             break;
@@ -109,6 +117,11 @@ static QUIC_STATUS QUIC_API connection_callback(HQUIC conn, void *ctx, QUIC_CONN
     return QUIC_STATUS_SUCCESS;
 }
 
+/** @brief Trigger when any event is catched by listener.
+ * Then check if it is `QUIC_LISTENER_EVENT_NEW_CONNECTION`,
+ * register connection_callback for any event cause in the
+ * connection which on behalf of event->NEW_CONNECTION.Connection.
+ */
 static QUIC_STATUS QUIC_API listener_callback(HQUIC listener, void *ctx, QUIC_LISTENER_EVENT *event) {
     (void)(listener);
     (void)ctx;
@@ -138,7 +151,7 @@ int main(int argc, char *argv[]) {
     /** PHASE 1. OPEN API TABLE. */
     /* Opens a new handle to the MsQuic library with version 2 API table. */
     s = MsQuicOpen2(&MsQuic);
-    if(s > QUIC_STATUS_SUCCESS) {
+    if(QUIC_FAILED(s)) {
         fprintf(stderr, "MsQuicOpen2 failed: %d\n", (int)(s));
         return 1;
     }
@@ -155,7 +168,7 @@ int main(int argc, char *argv[]) {
      * A caveat to this independence is that until a packet or connection can be determined to belong to a particular registration there is shared processing.
      */
     s = MsQuic->RegistrationOpen(&RegConfig, &Registration);
-    if(s > QUIC_STATUS_SUCCESS) {
+    if(QUIC_FAILED(s)) {
         fprintf(stderr, "RegistrationOpen failed: %d\n", (int)(s));
         return 1;
     }
@@ -183,7 +196,7 @@ int main(int argc, char *argv[]) {
      * The configuration must be cleaned up via ConfigurationClose when the application is done with it.
      */
     s = MsQuic->ConfigurationOpen(Registration, &Alpn, 1, &settings, sizeof(settings), NULL, &Configuration);
-    if(s > QUIC_STATUS_SUCCESS) {
+    if(QUIC_FAILED(s)) {
         fprintf(stderr, "ConfigurationOpen failed: %d\n", (int)(s));
         return 1;
     }
@@ -203,7 +216,7 @@ int main(int argc, char *argv[]) {
 
     /** @brief Loads the specified credential configuration for the configuration object. */
     s = MsQuic->ConfigurationLoadCredential(Configuration, &cred);
-    if(s > QUIC_STATUS_SUCCESS) {
+    if(QUIC_FAILED(s)) {
         fprintf(stderr, "Failed to load certificate/key: %d\n", (int)(s));
         return 1;
     }
@@ -224,7 +237,7 @@ int main(int argc, char *argv[]) {
      * Every listener created with a call to ListenerOpen MUST be cleaned up with a call to ListenerClose, otherwise a memory leak will occur.
      */
     s = MsQuic->ListenerOpen(Registration, listener_callback, NULL, &listener);
-    if(s > QUIC_STATUS_SUCCESS) {
+    if(QUIC_FAILED(s)) {
         fprintf(stderr, "ListenOpen failed: %d\n", (int)(s));
         return 1;
     }
@@ -235,7 +248,7 @@ int main(int argc, char *argv[]) {
     QuicAddrSetPort(&addr, port);
 
     s = MsQuic->ListenerStart(listener, &Alpn, 1, &addr);
-    if(s > QUIC_STATUS_SUCCESS) {
+    if(QUIC_FAILED(s)) {
         fprintf(stderr, "ListenerStart failed: %d\n", (int)(s));
         return 1;
     }
