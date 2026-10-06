@@ -1,14 +1,18 @@
+/**
+ * Build: gcc client.c -o client -lmsquic
+ */
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include <msquic.h>
 #include <semaphore.h>
 
 #define ALPN_NAME "echo-demo"
 #define BUF_SIZE  1024
 
-static QUIC_API_TABLE *MsQuic;  /* QUIC APIs Table. */
+static const QUIC_API_TABLE *MsQuic;  /* QUIC APIs Table. */
 static HQUIC Registration;      /* */
 static HQUIC Configuration;
 
@@ -33,7 +37,7 @@ static QUIC_STATUS QUIC_API stream_callback(HQUIC stream, void *ctx, QUIC_STREAM
         case QUIC_STREAM_EVENT_RECEIVE:
             for(uint32_t i = 0; i < event->RECEIVE.BufferCount; i++) {
                 const QUIC_BUFFER *b = &event->RECEIVE.Buffers[i];
-                fprintf(stdout, "ResponseL %.*s", (int)b->Length, (const char*)b->Buffer);
+                fprintf(stdout, "Response: %.*s", (int)b->Length, (const char*)b->Buffer);
             }
             fflush(stdout);
             sem_post(&reply_sem);
@@ -51,7 +55,7 @@ static QUIC_STATUS QUIC_API stream_callback(HQUIC stream, void *ctx, QUIC_STREAM
             sem_post(&reply_sem);
             break;
 
-        case QUIC_STREAM_EVENT_SEND_SHUTDOWN_COMPLETE:
+        case QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE:
             MsQuic->StreamClose(stream);
             break;
 
@@ -71,7 +75,7 @@ static QUIC_STATUS QUIC_API connection_callback(HQUIC conn, void *ctx, QUIC_CONN
             break;
 
         case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT:
-            fprintf(stderr, "Connnection failed/closed by transport: %d\n", (int)event->SHUTDOWN_INITIATED_BY_TRANSPORT.Status);
+            fprintf(stderr, "Connection failed/closed by transport: %d\n", (int)event->SHUTDOWN_INITIATED_BY_TRANSPORT.Status);
             g_closed = 1;
             sem_post(&connected_sem);
             sem_post(&reply_sem);
@@ -107,7 +111,7 @@ int main(int argc, char *argv[]) {
     sem_init(&reply_sem, 0, 0);
 
     s = MsQuicOpen2(&MsQuic);
-    if(s > QUIC_STATUS_SUCCESS) {
+    if(QUIC_FAILED(s)) {
         fprintf(stderr, "MsQuicOpen2 failed: %d\n", (int)s);
         return 1;
     }
@@ -117,7 +121,7 @@ int main(int argc, char *argv[]) {
         The `Registration` variable store the address pointing to that object.
     */
     s = MsQuic->RegistrationOpen(&RegConfig, &Registration);
-    if(s > QUIC_STATUS_SUCCESS) {
+    if(QUIC_FAILED(s)) {
         fprintf(stderr, "RegistrationOpen failed: %d\n", (int)s);
         return 1;
     }
@@ -128,7 +132,7 @@ int main(int argc, char *argv[]) {
     settings.IsSet.IdleTimeoutMs = TRUE;
 
     s = MsQuic->ConfigurationOpen(Registration, &Alpn, 1, &settings, sizeof(settings), NULL, &Configuration);
-    if(s > QUIC_STATUS_SUCCESS) {
+    if(QUIC_FAILED(s)) {
         fprintf(stderr, "ConfigurationOpen failed: %d\n", (int)s);
         return 1;
     }
@@ -139,20 +143,20 @@ int main(int argc, char *argv[]) {
     cred.Flags = QUIC_CREDENTIAL_FLAG_CLIENT | QUIC_CREDENTIAL_FLAG_NO_CERTIFICATE_VALIDATION;
 
     s = MsQuic->ConfigurationLoadCredential(Configuration, &cred);
-    if(s > QUIC_STATUS_SUCCESS) {
+    if(QUIC_FAILED(s)) {
         fprintf(stderr, "ConfigurationLoadCredential failed: %d\n", (int)s);
         return 1;
     }
 
     HQUIC conn = NULL;
     s = MsQuic->ConnectionOpen(Registration, connection_callback, NULL, &conn);
-    if(s > QUIC_STATUS_SUCCESS) {
+    if(QUIC_FAILED(s)) {
         fprintf(stderr, "ConnectionOpen failed: %d\n", (int)s);
         return 1;
     }
 
     s = MsQuic->ConnectionStart(conn, Configuration, QUIC_ADDRESS_FAMILY_UNSPEC, argv[1], port);
-    if(s > QUIC_STATUS_SUCCESS) {
+    if(QUIC_FAILED(s)) {
         fprintf(stderr, "ConnectionStart failed: %d\n", (int)s);
         return 1;
     }
@@ -164,13 +168,13 @@ int main(int argc, char *argv[]) {
 
     HQUIC stream = NULL;
     s = MsQuic->StreamOpen(conn, QUIC_STREAM_OPEN_FLAG_NONE, stream_callback, NULL, &stream);
-    if(s > QUIC_STATUS_SUCCESS) {
+    if(QUIC_FAILED(s)) {
         fprintf(stderr, "StreamOpen failed: %d\n", (int)s);
         return 1;
     }
 
     s = MsQuic->StreamStart(stream, QUIC_STREAM_START_FLAG_NONE);
-    if(s > QUIC_STATUS_SUCCESS) {
+    if(QUIC_FAILED(s)) {
         fprintf(stderr, "StreamStart failed: %d\n", (int)s);
         return 1;
     }
@@ -190,7 +194,7 @@ int main(int argc, char *argv[]) {
         memcpy(qb->Buffer, input, len);
 
         s = MsQuic->StreamSend(stream, qb, 1, QUIC_SEND_FLAG_NONE, qb);
-        if(s > QUIC_STATUS_SUCCESS) {
+        if(QUIC_FAILED(s)) {
             free(qb);
             fprintf(stderr, "StreamSend failed: %d\n", (int)s);
             break;
